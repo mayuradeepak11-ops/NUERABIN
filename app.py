@@ -104,7 +104,7 @@ is always correct.
                 )
 
                 response = client.models.generate_content(
-                    model="gemini-flash-latest",
+                    model="gemini-4-argon",
                     contents=[prompt, image_part]
                 )
 
