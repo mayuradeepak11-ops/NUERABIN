@@ -103,7 +103,7 @@ is always correct.
                 )
 
                 response = client.models.generate_content(
-                    model="	gemini-4-argon",
+                    model="gemini-4-argon",
                     contents=[prompt, image_part]
                 )
 
