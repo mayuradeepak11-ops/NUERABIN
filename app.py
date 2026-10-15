@@ -1,3 +1,67 @@
+
+import streamlit as st
+from google import genai
+from google.genai import types
+
+st.set_page_config(
+    page_title="NUERABIN Rescue",
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #071b17, #10352a);
+    color: #f2fff6;
+}
+h1, h2, h3, p, label {
+    color: #f2fff6;
+}
+div[data-testid="stMetric"] {
+    background: #174335;
+    padding: 15px;
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("NUERABIN RESCUE")
+st.subheader("AI-powered waste recovery")
+st.write(
+    "Upload an image. Let AI identify the item and explore "
+    "ways to reuse, repair, donate, recycle, compost or dispose of it safely."
+)
+
+# Read the API key from Streamlit's private secrets configuration
+api_key = st.secrets["GEMINI_API_KEY"]
+
+uploaded = st.file_uploader(
+    "Upload a photo of any item",
+    type=["jpg", "jpeg", "png", "webp"]
+)
+
+extra_info = st.text_input(
+    "Anything else about the item? (optional)",
+    placeholder="e.g. It no longer works, or it is slightly damaged"
+)
+
+if uploaded:
+    st.image(
+        uploaded,
+        caption="Uploaded item",
+        use_container_width=True
+    )
+
+    if st.button("Analyze with AI", type="primary"):
+        prompt = """
+You are NUERABIN Rescue, an assistant for responsible waste recovery.
+
+Examine the uploaded image and respond in clear, practical English.
+
+Identify:
+1. The most likely object and visible material.
+2. Any visible condition or damage. Do not guess hidden details.
+3. The best next step, prioritizing reuse, repair, donation,
    recycling or composting when appropriate.
 4. Safe preparation and handling instructions.
 5. The appropriate disposal or collection destination.
@@ -39,40 +103,10 @@ is always correct.
                     mime_type=uploaded.type
                 )
 
-                # Try the primary model, then a supported fallback if the
-                # primary model is temporarily unavailable.
-                response = None
-                models_to_try = [
-                    "gemini-3.8-flash",
-                    "gemini-3.5-flash-lite",
-                ]
-                last_error = None
-
-                for model_name in models_to_try:
-                    try:
-                        response = client.models.generate_content(
-                            model=model_name,
-                            contents=[prompt, image_part]
-                        )
-                        if response.text:
-                            break
-                        last_error = RuntimeError(
-                            f"{model_name} returned an empty response."
-                        )
-                    except Exception as model_error:
-                        last_error = model_error
-                        error_text = str(model_error).upper()
-                        status_code = getattr(model_error, "code", None)
-
-                        # Only switch models for temporary availability errors.
-                        if status_code == 503 or "503" in error_text or "UNAVAILABLE" in error_text:
-                            continue
-                        raise
-
-                if response is None or not response.text:
-                    if last_error:
-                        raise last_error
-                    raise RuntimeError("No Gemini model returned a response.")
+                response = client.models.generate_content(
+                    model="gemini-3.6-flash",
+                    contents=[prompt, image_part]
+                )
 
             if response.text:
                 st.session_state["recovery_result"] = response.text
@@ -83,28 +117,11 @@ is always correct.
                 )
 
         except Exception as e:
-            error_text = str(e).upper()
-            status_code = getattr(e, "code", None)
-
-            if status_code == 503 or "503" in error_text or "UNAVAILABLE" in error_text:
-                st.warning(
-                    "Gemini is temporarily busy, and the backup model is "
-                    "also unavailable. Please wait a few minutes and try again. "
-                    "Your uploaded image is still available."
-                )
-            elif status_code == 429 or "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
-                st.warning(
-                    "The Gemini API usage limit has been reached. "
-                    "Please check your API quota or try again after it resets."
-                )
-            elif status_code in (401, 403) or "API KEY" in error_text or "PERMISSION_DENIED" in error_text:
-                st.error(
-                    "Gemini API access was denied. Check that your API key "
-                    "is valid and that the selected models are available to your project."
-                )
-            else:
-                st.error("AI analysis failed. Please try again.")
-                st.caption(f"Technical details: {e}")
+            st.error(
+                "AI analysis failed. Check your internet connection, "
+                "API access and usage limits."
+            )
+            st.caption(f"Technical details: {e}")
 
 if st.session_state.get("recovery_result"):
     st.divider()
